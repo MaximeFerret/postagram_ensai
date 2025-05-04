@@ -58,7 +58,30 @@ bucket = os.getenv("BUCKET")
 ##                                                                                                ##
 ####################################################################################################
 
+from botocore.exceptions import ClientError
 
+def create_presigned_url(bucket_name, object_name, expiration=3600):
+    """Generate a presigned URL to share an S3 object
+
+    :param bucket_name: string
+    :param object_name: string
+    :param expiration: Time in seconds for the presigned URL to remain valid
+    :return: Presigned URL as string. If error, returns None.
+    """
+
+    # Generate a presigned URL for the S3 object
+    s3_client = boto3.client('s3')
+    try:
+        response = s3_client.generate_presigned_url('get_object',
+                                                    Params={'Bucket': bucket_name,
+                                                            'Key': object_name},
+                                                    ExpiresIn=expiration)
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    # The response contains the presigned URL
+    return response
 
 
 @app.post("/posts")
@@ -71,37 +94,88 @@ async def post_a_post(post: Post, authorization: str | None = Header(default=Non
     logger.info(f"user : {authorization}")
 
 
-    # Doit retourner le résultat de la requête la table dynamodb
+    post_id = f"POST#{uuid.uuid4()}"
+    user = f"USER#{authorization}"
+
+    item = {
+        "user": user,
+        "id": post_id,
+        "title": post.title,
+        "body": post.body,
+        "image": "",
+    }
+
+    res = table.put_item(Item=item)
     return res
+
 
 @app.get("/posts")
 async def get_all_posts(user: Union[str, None] = None):
-    """
-    Récupère tout les postes. 
-    - Si un user est présent dans le requête, récupère uniquement les siens
-    - Si aucun user n'est présent, récupère TOUS les postes de la table !!
-    """
-    if user :
+    if user:
         logger.info(f"Récupération des postes de : {user}")
-    else :
+        response = table.scan()
+        items = [item for item in response.get("Items", []) if item.get("user") == f"USER#{user}"]
+    else:
         logger.info("Récupération de tous les postes")
-     # Doit retourner une liste de posts
-    return res[""]
+        response = table.scan()
+        items = response.get("Items", [])
+
+    # Ajout de l'URL présignée si une image est présente
+    for post in items:
+        if post.get("image"):
+            try:
+                url = create_presigned_url(bucket, post.get("image"))
+                post["image"] = url
+            except Exception as e:
+                logger.error(f"Erreur génération URL signée : {e}")
+                post["image"] = None
+
+    return items
+
+
 
     
 @app.delete("/posts/{post_id}")
 async def delete_post(post_id: str, authorization: str | None = Header(default=None)):
-    # Doit retourner le résultat de la requête la table dynamodb
-    logger.info(f"post id : {post_id}")
-    logger.info(f"user: {authorization}")
-    # Récupération des infos du poste
+    user_key = f"USER#{authorization}"
+    post_key = f"POST#{post_id}"
 
-    # S'il y a une image on la supprime de S3
+    logger.info(f"Suppression du post : {post_key} de l'utilisateur : {user_key}")
 
-    # Suppression de la ligne dans la base dynamodb
+    # On récupère le post pour voir s'il y a une image
+    response = table.get_item(
+        Key={
+            "user": user_key,
+            "id": post_key
+        }
+    )
 
-    # Retourne le résultat de la requête de suppression
-    return item
+    item = response.get("Item", None)
+
+    if item is None:
+        return {"message": "Post non trouvé"}
+
+    # Suppression de l'image dans S3 si présente
+    if item.get("image"):
+        try:
+            s3_client.delete_object(
+                Bucket=bucket,
+                Key=item["image"]
+            )
+            logger.info(f"Image {item['image']} supprimée du bucket")
+        except Exception as e:
+            logger.error(f"Erreur suppression image S3 : {e}")
+
+    # Suppression de la ligne dans DynamoDB
+    res = table.delete_item(
+        Key={
+            "user": user_key,
+            "id": post_key
+        }
+    )
+
+    return res
+
 
 
 

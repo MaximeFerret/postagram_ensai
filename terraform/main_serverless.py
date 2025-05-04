@@ -12,6 +12,8 @@ from cdktf_cdktf_provider_aws.s3_bucket_cors_configuration import S3BucketCorsCo
 from cdktf_cdktf_provider_aws.s3_bucket_notification import S3BucketNotification, S3BucketNotificationLambdaFunction
 from cdktf_cdktf_provider_aws.dynamodb_table import DynamodbTable, DynamodbTableAttribute
 
+import os
+
 class ServerlessStack(TerraformStack):
     def __init__(self, scope: Construct, id: str):
         super().__init__(scope, id)
@@ -21,7 +23,8 @@ class ServerlessStack(TerraformStack):
         
         bucket = S3Bucket(
             self, "bucket",
-            bucket_prefix=""
+            bucket_prefix="cdtf-postagram-bucket",
+            force_destroy=True
         )
 
         # NE PAS TOUCHER !!!!
@@ -37,30 +40,30 @@ class ServerlessStack(TerraformStack):
 
         dynamo_table = DynamodbTable(
             self, "DynamodDB-table",
-            name= "",
-            hash_key="",
-            range_key="",
+            name= "postagram_table",
+            hash_key="user",
+            range_key="id",
             attribute=[
-                DynamodbTableAttribute(name="",type="S" ),
-                DynamodbTableAttribute(name="",type="S" ),
+                DynamodbTableAttribute(name="user",type="S" ),
+                DynamodbTableAttribute(name="id",type="S" ),
             ],
             billing_mode="PROVISIONED",
             read_capacity=5,
             write_capacity=5
         )
 
-        code = TerraformAsset()
+        code = TerraformAsset(self, "serverless-lambda-code", path="./lambda",type=AssetType.ARCHIVE)
 
         lambda_function = LambdaFunction(
             self, "lambda",
-            function_name="",
+            function_name="PostagramFunction",
             runtime="python3.10",
+            handler="lambda_function.lambda_handler",
+            filename=code.path,
             memory_size=128,
             timeout=60,
-            role=f"",
-            filename= code.path,
-            handler="",
-            environment={"variables":{}}
+            role=f"arn:aws:iam::{account_id}:role/LabRole",
+            environment={"variables":{"DYNAMO_TABLE":dynamo_table.id,"BUCKET":bucket.id}}
         )
 
         # NE PAS TOUCHER !!!!
@@ -86,9 +89,17 @@ class ServerlessStack(TerraformStack):
             depends_on=[permission]
         )
 
+        TerraformOutput(
+            self, "bucket_output",
+            value=bucket.id
+        )
+
+        TerraformOutput(
+            self, "table_output",
+            value=dynamo_table.name
+        )
 
 
 app = App()
 ServerlessStack(app, "cdktf_serverless")
 app.synth()
-
