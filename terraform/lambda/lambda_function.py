@@ -26,7 +26,7 @@ def lambda_handler(event, context):
         return
 
     # Ajout des tags user et task_uuid
-    user, post_id = f"USER#{user}", f"POST#{post_id}"
+    #user, post_id = f"USER#{user}", f"POST#{post_id}"
 
     # Appel à reckognition
     try:
