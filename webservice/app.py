@@ -128,8 +128,12 @@ async def get_all_posts(user: Union[str, None] = None):
                 post["image"] = url
             except Exception as e:
                 logger.error(f"Erreur génération URL signée : {e}")
-                post["image"] = None
-
+                post["image"] = ""
+        if "labels" in post:
+            logger.info(f"Labels trouvés pour le post {post['id']}: {post['labels']}")
+        else:
+            post["labels"] = []
+            
     return items
 
 

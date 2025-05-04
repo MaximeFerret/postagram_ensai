@@ -12,6 +12,7 @@
   Etape 2 :
   cd terraform
   cdktf deploy --app "python main_serverless.py"
+  Pensez à changer le BUCKET=cdtf-postagram-bucket...
   cdktf deploy --app "python main_server.py"
 
   Etape 3 :

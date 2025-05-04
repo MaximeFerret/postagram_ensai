@@ -8,9 +8,10 @@ import axios from 'axios'
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-axios.defaults.baseURL = "http://tf-lb-20250504133335453800000003-1481159754.us-east-1.elb.amazonaws.com"  
+axios.defaults.baseURL = "http://localhost:8080"
 // ^^^^
 // EC2 > Equilibrage de charge > http://<copier le nom du DNS le Load Balancer créé>
+// ressemble à http://tf-lb-20250504143903154700000003-1723265025.us-east-1.elb.amazonaws.com
 
 root.render(
   <React.StrictMode>

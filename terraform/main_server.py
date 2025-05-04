@@ -78,7 +78,16 @@ class ServerStack(TerraformStack):
             port=80,
             protocol="HTTP",
             vpc_id=default_vpc.id,
-            target_type="instance"
+            target_type="instance",
+            health_check={
+                "interval": 30,
+                "path": "/docs",
+                "port": "8080",
+                "protocol": "HTTP",
+                "timeout": 5,  
+                "healthy_threshold": 2,  
+                "unhealthy_threshold": 2,
+            }
         )
 
         lb_listener = LbListener(
